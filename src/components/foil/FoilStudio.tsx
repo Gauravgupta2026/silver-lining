@@ -40,6 +40,7 @@ const DEFAULT_STAGE: Stage = { background: "#ffffff", width: 60 };
 const COPIED_MS = 1500;
 const TABS = [
   { key: "picture", label: "Picture" },
+  { key: "paper", label: "Paper" },
   { key: "foil", label: "Foil" },
   { key: "finish", label: "Finish" },
   { key: "export", label: "Export" },
@@ -87,6 +88,8 @@ function bakedSnippet(s: FoilSettings, base: string): string {
 const GHOST = "rounded-control border border-ink bg-transparent px-3 py-1.5 text-body-sm transition-colors hover:bg-ink hover:text-paper";
 /** Annotation text: mono with positive tracking, never body copy. */
 const ANNOTATION = "font-mono text-caption text-graphite";
+/** Chip row: one line that scrolls sideways on small screens (keeps tabs one screen tall), wraps from lg up. */
+const CHIPS = "flex gap-2 overflow-x-auto [scrollbar-width:none] lg:flex-wrap lg:overflow-visible [&>*]:shrink-0";
 
 /** One row per slider: label, track, value. Halves the panel height versus stacked rows. */
 function Slider(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; hint?: string; testId?: string }) {
@@ -110,7 +113,7 @@ function Slider(props: { label: string; value: number; min: number; max: number;
 
 function Section({ title, action, children }: { n?: number; title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="space-y-3 border-mist px-4 py-4 sm:px-5 [&+&]:border-t">
+    <section className="space-y-2 border-mist px-4 py-3 sm:px-5 lg:space-y-3 lg:py-4 [&+&]:border-t">
       <h2 className="flex items-baseline gap-2 text-body font-[450]">
         {title}
         {action && <span className="ml-auto">{action}</span>}
@@ -291,7 +294,7 @@ export function FoilStudio() {
       <SiteNav current="studio" />
       <div className={`flex min-h-0 flex-1 flex-col lg:grid ${menuOpen ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]" : "lg:grid-cols-1"}`}>
         <div
-          className={`relative flex items-center justify-center overflow-hidden [container-type:size] ${menuOpen ? "h-[42svh] shrink-0 lg:h-auto" : "flex-1"}`}
+          className={`relative flex items-center justify-center overflow-hidden [container-type:size] ${menuOpen ? "min-h-[22svh] flex-1 lg:min-h-0" : "flex-1"}`}
           style={{ background: stage.background }}
           onDragOver={(e) => {
             e.preventDefault();
@@ -337,12 +340,12 @@ export function FoilStudio() {
         </div>
 
         {menuOpen && (
-          <aside className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-mist bg-paper lg:border-l lg:border-t-0">
-            <header className="sticky top-0 z-20 bg-paper px-4 pb-3 pt-4 sm:px-5">
-              <h1 className="text-heading font-[340]">Foil studio</h1>
+          <aside className="max-h-[74svh] shrink-0 overflow-y-auto lg:max-h-none lg:min-h-0 overscroll-contain border-t border-mist bg-paper lg:border-l lg:border-t-0">
+            <header className="sticky top-0 z-20 bg-paper px-4 pb-2 pt-3 sm:px-5 lg:pb-3 lg:pt-4">
+              <h1 className="text-heading font-[340] max-lg:sr-only">Foil studio</h1>
               <p className="mt-1 text-body-sm text-graphite [@media(max-height:820px)]:hidden max-lg:hidden">Turn an illustration into hot-foil stamping that catches the cursor&apos;s light.</p>
               {/* Tabs keep each group of controls within one screen, so the studio never becomes a long scroll. */}
-              <div role="tablist" className="mt-3 flex gap-1">
+              <div role="tablist" className="flex gap-1 lg:mt-3">
                 {TABS.map((t) => (
                   <button
                     key={t.key}
@@ -350,7 +353,7 @@ export function FoilStudio() {
                     role="tab"
                     aria-selected={tab === t.key}
                     onClick={() => setTab(t.key)}
-                    className={`flex-1 rounded-pill px-2 py-1 text-body-sm transition-colors ${tab === t.key ? "bg-ink text-paper" : "text-graphite hover:text-ink"}`}
+                    className={`flex-1 rounded-pill px-1 py-1 text-body-sm transition-colors ${tab === t.key ? "bg-ink text-paper" : "text-graphite hover:text-ink"}`}
                   >
                     {t.label}
                   </button>
@@ -383,7 +386,7 @@ export function FoilStudio() {
                   e.target.value = "";
                 }}
               />
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className={`${CHIPS} items-center`}>
                 <span className={ANNOTATION}>SAMPLES</span>
                 {SAMPLES.map((s) => (
                   <TextAction
@@ -399,7 +402,7 @@ export function FoilStudio() {
                 ))}
               </div>
               <div className={ANNOTATION}>SHAPE</div>
-              <div className="flex flex-wrap gap-2">
+              <div className={CHIPS}>
                 {(Object.keys(SHAPES) as ShapeKey[]).map((k) => (
                   <Choice key={k} value={k} current={settings.shape} onSelect={(shape) => set({ shape })}>
                     {SHAPES[k].name}
@@ -408,8 +411,12 @@ export function FoilStudio() {
               </div>
             </Section>
 
+              </>
+            )}
+            {tab === "paper" && (
+              <>
             <Section n={4} title="Background">
-              <div className="flex flex-wrap gap-2">
+              <div className={CHIPS}>
                 <Choice value={"transparent" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
                   Cut out
                 </Choice>
@@ -418,7 +425,7 @@ export function FoilStudio() {
                 </Choice>
               </div>
               <div className={ANNOTATION}>OR REPAINT AS PAPER</div>
-              <div className="flex flex-wrap gap-2">
+              <div className={CHIPS}>
                 {(Object.keys(PAPERS) as PaperKey[]).map((k) => (
                   <button
                     key={k}
@@ -440,7 +447,7 @@ export function FoilStudio() {
             {tab === "foil" && (
               <>
             <Section n={2} title="What turns to foil" action={<TextAction onClick={surprise}>Surprise me</TextAction>}>
-              <div className="flex flex-wrap gap-2">
+              <div className={CHIPS}>
                 {(Object.keys(FOIL_MODES) as FoilMode[]).map((k) => (
                   <Choice key={k} value={k} current={settings.mode} onSelect={setMode} title={FOIL_MODES[k].hint}>
                     {FOIL_MODES[k].name}
@@ -476,7 +483,7 @@ export function FoilStudio() {
             </Section>
 
             <Section n={3} title="Foil colour">
-              <div className="flex flex-wrap gap-2">
+              <div className={CHIPS}>
                 {(Object.keys(FOILS) as FoilKey[]).map((k) => {
                   const f = FOILS[k];
                   const on = settings.foil === k;
@@ -537,7 +544,7 @@ export function FoilStudio() {
                   </button>
                 )}
               </div>
-              <pre data-testid="snippet" className="max-h-28 overflow-auto whitespace-pre-wrap rounded-control bg-mist/50 p-4 font-mono text-caption leading-relaxed text-ink">
+              <pre data-testid="snippet" className="max-h-28 overflow-auto [@media(max-height:700px)]:max-h-20 whitespace-pre-wrap rounded-control bg-mist/50 p-4 font-mono text-caption leading-relaxed text-ink">
                 {code}
               </pre>
               {/* The one indigo element in the view: the main thing to do here. */}
@@ -575,7 +582,7 @@ export function FoilStudio() {
                   }}
                 />
               </div>
-              <p className="text-body-sm text-graphite" title="Download the maps again after changing anything outside Finish.">
+              <p className="text-body-sm text-graphite [@media(max-height:700px)]:hidden" title="Download the maps again after changing anything outside Finish.">
                 {output === "baked" ? "Put both maps in /public, then paste the JSX." : "Put the picture in /public, then paste the JSX."}
               </p>
             </Section>
