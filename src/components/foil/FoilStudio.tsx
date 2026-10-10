@@ -36,7 +36,7 @@ const SAMPLES = [
   { src: "/foil/umbrella.png", name: "umbrella.png" },
   { src: "/foil/demo.svg", name: "demo.svg" },
 ] as const;
-const DEFAULT_STAGE: Stage = { background: "#ffffff", width: 60 };
+const DEFAULT_STAGE: Stage = { background: "#f7f5f3", width: 60 };
 const COPIED_MS = 1500;
 const TABS = [
   { key: "picture", label: "Picture" },
@@ -84,17 +84,17 @@ function bakedSnippet(s: FoilSettings, base: string): string {
   return `<FoilArt\n  src="/${base}-print.png"\n  fx="/${base}-fx.png"\n  alt=""${settings}\n/>`;
 }
 
-/** Secondary action: transparent, 1px ink border, 8px radius. Indigo is reserved for the one primary. */
-const GHOST = "rounded-control border border-ink bg-transparent px-3 py-1.5 text-body-sm transition-colors hover:bg-ink hover:text-paper";
-/** Annotation text: mono with positive tracking, never body copy. */
-const ANNOTATION = "font-mono text-caption text-graphite";
-/** Chip row: one line that scrolls sideways on small screens (keeps tabs one screen tall), wraps from lg up. */
-const CHIPS = "flex gap-2 overflow-x-auto [scrollbar-width:none] lg:flex-wrap lg:overflow-visible [&>*]:shrink-0";
+/** All actions share the guide's radius and monochrome palette. */
+const GHOST = "rounded-2xl border border-ink-black/15 bg-paper-white px-4 py-2 text-body transition-colors hover:bg-ink-black hover:text-paper-white";
+/** Muted supporting information uses the caption scale. */
+const ANNOTATION = "text-caption text-stone";
+/** Wrap choices so every option remains visible at narrow widths. */
+const CHIPS = "flex flex-wrap gap-2 [&>*]:shrink-0";
 
 /** One row per slider: label, track, value. Halves the panel height versus stacked rows. */
 function Slider(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; hint?: string; testId?: string }) {
   return (
-    <label className="grid grid-cols-[6.5rem_minmax(0,1fr)_2.75rem] items-center gap-2 text-body-sm" title={props.hint}>
+    <label className="grid grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)_2.75rem] items-center gap-2 text-body" title={props.hint}>
       <span className="truncate">{props.label}</span>
       <input
         type="range"
@@ -113,8 +113,8 @@ function Slider(props: { label: string; value: number; min: number; max: number;
 
 function Section({ title, action, children }: { n?: number; title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="space-y-2 border-mist px-4 py-3 sm:px-5 lg:space-y-3 lg:py-4 [&+&]:border-t">
-      <h2 className="flex items-baseline gap-2 text-body font-[450]">
+    <section className="studio-section">
+      <h2 className="flex items-baseline gap-2 text-body font-medium">
         {title}
         {action && <span className="ml-auto">{action}</span>}
       </h2>
@@ -126,13 +126,13 @@ function Section({ title, action, children }: { n?: number; title: string; actio
 /** Text-only inline action (Surprise me, Reset): underlined ink, no fill. */
 function TextAction({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className="text-body-sm font-normal underline decoration-mist underline-offset-4 hover:decoration-ink">
+    <button type="button" onClick={onClick} className="text-body font-normal underline decoration-ink-black/15 underline-offset-4 hover:decoration-ink-black">
       {children}
     </button>
   );
 }
 
-/** Chip: 50px pill. Selected inverts to solid ink. */
+/** Selected choices invert to ink; surfaces stay flat. */
 function Choice<T extends string>(props: { value: T; current: T; onSelect: (v: T) => void; children: ReactNode; title?: string }) {
   const on = props.value === props.current;
   return (
@@ -141,7 +141,7 @@ function Choice<T extends string>(props: { value: T; current: T; onSelect: (v: T
       title={props.title}
       aria-pressed={on}
       onClick={() => props.onSelect(props.value)}
-      className={`rounded-pill border px-3 py-1 text-body-sm transition-colors ${on ? "border-ink bg-ink text-paper" : "border-mist bg-paper hover:border-ink"}`}
+      className={`rounded-2xl border px-3 py-1 text-body transition-colors ${on ? "border-ink-black bg-ink-black text-paper-white" : "border-ink-black/15 bg-paper-white hover:border-ink-black"}`}
     >
       {props.children}
     </button>
@@ -290,11 +290,11 @@ export function FoilStudio() {
   const showAmount = settings.mode !== "all" && (settings.mode !== "colour" || settings.pick);
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-paper text-body-sm text-ink">
+    <div className="app-shell text-body">
       <SiteNav current="studio" />
-      <div className={`flex min-h-0 flex-1 flex-col lg:grid ${menuOpen ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]" : "lg:grid-cols-1"}`}>
+      <main className={`studio-workspace ${menuOpen ? "" : "panel-hidden"}`}>
         <div
-          className={`relative flex items-center justify-center overflow-hidden [container-type:size] ${menuOpen ? "min-h-[22svh] flex-1 lg:min-h-0" : "flex-1"}`}
+          className="studio-stage"
           style={{ background: stage.background }}
           onDragOver={(e) => {
             e.preventDefault();
@@ -323,46 +323,59 @@ export function FoilStudio() {
             // Fit inside the stage on both axes: the width share, capped so the height never exceeds ART_MAX_HEIGHT.
             style={{ width: `min(${stage.width}cqw, ${ART_MAX_HEIGHT_CQH * artAspect}cqh)` }}
           />
-          <button type="button" onClick={() => setMenuOpen((o) => !o)} className={`absolute right-3 top-3 bg-paper sm:right-4 sm:top-4 ${GHOST}`}>
+          <button type="button" aria-expanded={menuOpen} aria-controls="studio-panel" onClick={() => setMenuOpen((o) => !o)} className={`absolute right-3 top-3 bg-paper-white sm:right-4 sm:top-4 ${GHOST}`}>
             {menuOpen ? "Hide panel" : "Show panel"}
           </button>
-          <p data-testid="status" className={`absolute bottom-3 left-3 max-w-[60%] truncate sm:bottom-4 sm:left-4 ${ANNOTATION}`}>
+          <p data-testid="status" className={`stage-status ${ANNOTATION}`}>
             {fileName} · {status}
           </p>
-          <p className="pointer-events-none absolute bottom-3 right-4 hidden text-body-sm text-graphite md:block">
+          <p className="stage-instruction">
             {settings.mode === "colour" && !settings.pick ? "Click the picture to choose the foil colour" : "Move to steer the light · drag to tilt"}
           </p>
           {dragging && (
-            <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-card border border-dashed border-ink bg-paper/90 text-heading font-[340]">
+            <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-2xl border border-dashed border-ink-black bg-paper-white/90 text-heading font-[350]">
               Drop your picture
             </div>
           )}
         </div>
 
         {menuOpen && (
-          <aside className="max-h-[74svh] shrink-0 overflow-y-auto lg:max-h-none lg:min-h-0 overscroll-contain border-t border-mist bg-paper lg:border-l lg:border-t-0">
-            <header className="sticky top-0 z-20 bg-paper px-4 pb-2 pt-3 sm:px-5 lg:pb-3 lg:pt-4">
-              <h1 className="text-heading font-[340] max-lg:sr-only">Foil studio</h1>
-              <p className="mt-1 text-body-sm text-graphite [@media(max-height:820px)]:hidden max-lg:hidden">Turn an illustration into hot-foil stamping that catches the cursor&apos;s light.</p>
+          <aside id="studio-panel" aria-label="Foil controls" className="studio-panel">
+            <header className="studio-panel-header">
+              <h1 className="studio-title">Foil studio</h1>
+              <p className="studio-description">Turn an illustration into hot-foil stamping that catches the cursor&apos;s light.</p>
               {/* Tabs keep each group of controls within one screen, so the studio never becomes a long scroll. */}
-              <div role="tablist" className="flex gap-1 lg:mt-3">
+              <div role="tablist" aria-label="Studio settings" className="studio-tabs">
                 {TABS.map((t) => (
                   <button
                     key={t.key}
                     type="button"
                     role="tab"
+                    id={`tab-${t.key}`}
+                    aria-controls="studio-tabpanel"
+                    tabIndex={tab === t.key ? 0 : -1}
                     aria-selected={tab === t.key}
+                    onKeyDown={(e) => {
+                      const index = TABS.findIndex((item) => item.key === tab);
+                      const next = e.key === "ArrowRight" ? (index + 1) % TABS.length : e.key === "ArrowLeft" ? (index + TABS.length - 1) % TABS.length : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : null;
+                      if (next !== null) {
+                        e.preventDefault();
+                        setTab(TABS[next].key);
+                        document.getElementById(`tab-${TABS[next].key}`)?.focus();
+                      }
+                    }}
                     onClick={() => setTab(t.key)}
-                    className={`flex-1 rounded-pill px-1 py-1 text-body-sm transition-colors ${tab === t.key ? "bg-ink text-paper" : "text-graphite hover:text-ink"}`}
+                    className={`flex-1 rounded-2xl px-1 py-1 text-body transition-colors ${tab === t.key ? "bg-ink-black text-paper-white" : "text-stone hover:text-ink-black"}`}
                   >
                     {t.label}
                   </button>
                 ))}
               </div>
             </header>
+            <div key={tab} id="studio-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`tab-${tab}`} className="studio-panel-content">
             {error && (
-              // Sticky, so errors from any section stay visible. Achromatic by design: ink on mist.
-              <div role="alert" className="sticky top-0 z-10 mx-4 mb-3 sm:mx-5 flex items-start gap-3 rounded-control bg-mist px-4 py-3 text-body-sm">
+              // Keep errors visible while the controls scroll.
+              <div role="alert" className="sticky top-0 z-10 mx-4 mb-3 sm:mx-5 flex items-start gap-3 rounded-2xl bg-linen-canvas px-4 py-3 text-body">
                 <span className="flex-1">{error}</span>
                 <button type="button" aria-label="Dismiss" onClick={() => setError(null)} className="leading-none">
                   ×
@@ -434,12 +447,12 @@ export function FoilStudio() {
                     aria-label={PAPERS[k].name}
                     aria-pressed={settings.ground === k}
                     onClick={() => set({ ground: k })}
-                    className={`h-8 w-8 rounded-full border ${settings.ground === k ? "border-ink ring-2 ring-ink ring-offset-2" : "border-mist"}`}
+                    className={`h-8 w-8 rounded-full border ${settings.ground === k ? "border-ink-black ring-2 ring-ink-black ring-offset-2" : "border-ink-black/15"}`}
                     style={{ background: rgbCss(PAPERS[k].rgb) }}
                   />
                 ))}
               </div>
-              <p className="text-body-sm text-graphite">Works when the picture sits on a plain, light background.</p>
+              <p className="text-body text-stone">Works when the picture sits on a plain, light background.</p>
             </Section>
 
               </>
@@ -454,15 +467,15 @@ export function FoilStudio() {
                   </Choice>
                 ))}
               </div>
-              <p className="text-body-sm text-graphite">{mode.hint}</p>
+              <p className="text-body text-stone">{mode.hint}</p>
               {settings.mode === "colour" && (
                 <div className="flex items-center gap-3">
                   <span
                     data-testid="pick-swatch"
-                    className="h-6 w-6 rounded-fine border border-mist"
+                    className="h-6 w-6 rounded-2xl border border-ink-black/15"
                     style={{ background: settings.pick ? rgbCss(settings.pick) : "repeating-linear-gradient(45deg,#e2e2e2 0 4px,#fff 4px 8px)" }}
                   />
-                  <span className={settings.pick ? ANNOTATION : "text-body-sm text-graphite"}>{settings.pick ? rgbCss(settings.pick) : "No colour picked yet"}</span>
+                  <span className={settings.pick ? ANNOTATION : "text-body text-stone"}>{settings.pick ? rgbCss(settings.pick) : "No colour picked yet"}</span>
                 </div>
               )}
               {showAmount && (
@@ -477,7 +490,7 @@ export function FoilStudio() {
                 />
               )}
               <label className="flex items-center gap-3">
-                <input type="checkbox" className="h-4 w-4 accent-ink" checked={settings.border} onChange={(e) => set({ border: e.target.checked })} />
+                <input type="checkbox" className="h-4 w-4 accent-ink-black" checked={settings.border} onChange={(e) => set({ border: e.target.checked })} />
                 A foil border round the edge
               </label>
             </Section>
@@ -494,7 +507,7 @@ export function FoilStudio() {
                       title={f.name}
                       aria-pressed={on}
                       onClick={() => set({ foil: k })}
-                      className={`flex items-center gap-2 rounded-pill border px-3 py-1 text-body-sm transition-colors ${on ? "border-ink" : "border-mist hover:border-ink"}`}
+                      className={`flex items-center gap-2 rounded-2xl border px-3 py-1 text-body transition-colors ${on ? "border-ink-black" : "border-ink-black/15 hover:border-ink-black"}`}
                     >
                       {/* The swatch is the work's colour, not UI colour. */}
                       <span className="h-3.5 w-3.5 rounded-full" style={{ background: "holo" in f ? "conic-gradient(#ffc9c1, #c4baff, #c7f8fb, #e4ff97, #ffc9c1)" : rgbCss(f.ink) }} />
@@ -520,7 +533,7 @@ export function FoilStudio() {
 
             <Section n={6} title="Stage">
               <label className="flex items-center gap-3">
-                <input type="color" className="h-8 w-10 rounded-control border border-mist" value={stage.background} onChange={(e) => setStage((s) => ({ ...s, background: e.target.value }))} />
+                <input type="color" className="h-8 w-10 rounded-2xl border border-ink-black/15" value={stage.background} onChange={(e) => setStage((s) => ({ ...s, background: e.target.value }))} />
                 Preview background
               </label>
               <Slider label="Size %" value={stage.width} min={20} max={100} step={1} onChange={(width) => setStage((s) => ({ ...s, width }))} />
@@ -544,11 +557,11 @@ export function FoilStudio() {
                   </button>
                 )}
               </div>
-              <pre data-testid="snippet" className="max-h-28 overflow-auto [@media(max-height:700px)]:max-h-20 whitespace-pre-wrap rounded-control bg-mist/50 p-4 font-mono text-caption leading-relaxed text-ink">
+              <pre data-testid="snippet" className="max-h-28 overflow-auto [@media(max-height:700px)]:max-h-20 whitespace-pre-wrap rounded-2xl bg-linen-canvas p-4 font-mono text-caption leading-relaxed text-ink-black">
                 {code}
               </pre>
-              {/* The one indigo element in the view: the main thing to do here. */}
-              <button type="button" onClick={copyCode} className="w-full rounded-pill bg-indigo px-5 py-2.5 text-body-sm font-[480] text-paper hover:opacity-90">
+              {/* Primary export action. */}
+              <button type="button" onClick={copyCode} className="w-full rounded-2xl bg-ink-black px-5 py-2.5 text-body font-medium text-paper-white hover:opacity-90">
                 {copied === "jsx" ? "Copied" : "Copy JSX"}
               </button>
               <div className="grid grid-cols-2 gap-1.5">
@@ -582,15 +595,16 @@ export function FoilStudio() {
                   }}
                 />
               </div>
-              <p className="text-body-sm text-graphite [@media(max-height:700px)]:hidden" title="Download the maps again after changing anything outside Finish.">
+              <p className="text-body text-stone [@media(max-height:700px)]:hidden" title="Download the maps again after changing anything outside Finish.">
                 {output === "baked" ? "Put both maps in /public, then paste the JSX." : "Put the picture in /public, then paste the JSX."}
               </p>
             </Section>
               </>
             )}
+            </div>
           </aside>
         )}
-      </div>
+      </main>
     </div>
   );
 }
