@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import { SiteNav } from "@/components/SiteNav";
 import { FoilArt, forgetImage, type FoilHandle } from "./FoilArt";
 import {
@@ -33,8 +34,8 @@ interface Saved {
 
 const STORAGE_KEY = "foil-studio:v3";
 const SAMPLES = [
-  { src: "/foil/umbrella.png", name: "umbrella.png" },
-  { src: "/foil/demo.svg", name: "demo.svg" },
+  { src: "/foil/umbrella.png", name: "umbrella.png", label: "Parasol" },
+  { src: "/foil/demo.svg", name: "demo.svg", label: "Line art" },
 ] as const;
 const DEFAULT_STAGE: Stage = { background: "#f7f5f3", width: 60 };
 const COPIED_MS = 1500;
@@ -85,17 +86,17 @@ function bakedSnippet(s: FoilSettings, base: string): string {
 }
 
 /** All actions share the guide's radius and monochrome palette. */
-const GHOST = "rounded-2xl border border-ink-black/15 bg-paper-white px-4 py-2 text-body transition-colors hover:bg-ink-black hover:text-paper-white";
+const GHOST = "ui-button ui-button-secondary";
 /** Muted supporting information uses the caption scale. */
 const ANNOTATION = "text-caption text-stone";
 /** Wrap choices so every option remains visible at narrow widths. */
-const CHIPS = "flex flex-wrap gap-2 [&>*]:shrink-0";
+const CHIPS = "choice-list";
 
 /** One row per slider: label, track, value. Halves the panel height versus stacked rows. */
 function Slider(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; hint?: string; testId?: string }) {
   return (
-    <label className="grid grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)_2.75rem] items-center gap-2 text-body" title={props.hint}>
-      <span className="truncate">{props.label}</span>
+    <label className="studio-slider" title={props.hint}>
+      <span className="slider-label">{props.label}</span>
       <input
         type="range"
         data-testid={props.testId}
@@ -126,7 +127,7 @@ function Section({ title, action, children }: { n?: number; title: string; actio
 /** Text-only inline action (Surprise me, Reset): underlined ink, no fill. */
 function TextAction({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className="text-body font-normal underline decoration-ink-black/15 underline-offset-4 hover:decoration-ink-black">
+    <button type="button" onClick={onClick} className="text-action">
       {children}
     </button>
   );
@@ -134,14 +135,13 @@ function TextAction({ onClick, children }: { onClick: () => void; children: Reac
 
 /** Selected choices invert to ink; surfaces stay flat. */
 function Choice<T extends string>(props: { value: T; current: T; onSelect: (v: T) => void; children: ReactNode; title?: string }) {
-  const on = props.value === props.current;
   return (
     <button
       type="button"
       title={props.title}
-      aria-pressed={on}
+      aria-pressed={props.value === props.current}
       onClick={() => props.onSelect(props.value)}
-      className={`rounded-2xl border px-3 py-1 text-body transition-colors ${on ? "border-ink-black bg-ink-black text-paper-white" : "border-ink-black/15 bg-paper-white hover:border-ink-black"}`}
+      className="ui-choice"
     >
       {props.children}
     </button>
@@ -343,7 +343,7 @@ export function FoilStudio() {
           <aside id="studio-panel" aria-label="Foil controls" className="studio-panel">
             <header className="studio-panel-header">
               <h1 className="studio-title">Foil studio</h1>
-              <p className="studio-description">Turn an illustration into hot-foil stamping that catches the cursor&apos;s light.</p>
+              <p className="studio-description">Edit your illustration, paper and foil.</p>
               {/* Tabs keep each group of controls within one screen, so the studio never becomes a long scroll. */}
               <div role="tablist" aria-label="Studio settings" className="studio-tabs">
                 {TABS.map((t) => (
@@ -386,7 +386,7 @@ export function FoilStudio() {
             {tab === "picture" && (
               <>
             <Section n={1} title="Your picture">
-              <button type="button" onClick={() => fileInput.current?.click()} className={`w-full ${GHOST}`}>
+              <button type="button" onClick={() => fileInput.current?.click()} className="ui-button ui-button-primary">
                 {src.startsWith("blob:") ? "Change picture" : "Upload a picture"}
               </button>
               <input
@@ -399,23 +399,27 @@ export function FoilStudio() {
                   e.target.value = "";
                 }}
               />
-                            <div className={`${CHIPS} items-center`}>
-                <span className={ANNOTATION}>SAMPLES</span>
-                {SAMPLES.map((s) => (
-                  <TextAction
-                    key={s.src}
+              <div className={ANNOTATION}>Samples</div>
+              <div className="sample-picker">
+                {SAMPLES.map((sample) => (
+                  <button
+                    key={sample.src}
+                    type="button"
+                    aria-pressed={src === sample.src}
+                    className="sample-choice"
                     onClick={() => {
-                      setSrc(s.src);
-                      setFileName(s.name);
+                      setSrc(sample.src);
+                      setFileName(sample.name);
                       setError(null);
                     }}
                   >
-                    {s.name}
-                  </TextAction>
+                    <Image src={sample.src} alt="" width={120} height={72} />
+                    <span>{sample.label}</span>
+                  </button>
                 ))}
               </div>
-              <div className={ANNOTATION}>SHAPE</div>
-              <div className={CHIPS}>
+              <div className={ANNOTATION}>Shape</div>
+              <div className="choice-grid">
                 {(Object.keys(SHAPES) as ShapeKey[]).map((k) => (
                   <Choice key={k} value={k} current={settings.shape} onSelect={(shape) => set({ shape })}>
                     {SHAPES[k].name}
@@ -437,7 +441,7 @@ export function FoilStudio() {
                   Keep
                 </Choice>
               </div>
-              <div className={ANNOTATION}>OR REPAINT AS PAPER</div>
+              <div className={ANNOTATION}>Paper stock</div>
               <div className={CHIPS}>
                 {(Object.keys(PAPERS) as PaperKey[]).map((k) => (
                   <button
@@ -447,7 +451,7 @@ export function FoilStudio() {
                     aria-label={PAPERS[k].name}
                     aria-pressed={settings.ground === k}
                     onClick={() => set({ ground: k })}
-                    className={`h-8 w-8 rounded-full border ${settings.ground === k ? "border-ink-black ring-2 ring-ink-black ring-offset-2" : "border-ink-black/15"}`}
+                    className="paper-swatch"
                     style={{ background: rgbCss(PAPERS[k].rgb) }}
                   />
                 ))}
@@ -459,8 +463,8 @@ export function FoilStudio() {
             )}
             {tab === "foil" && (
               <>
-            <Section n={2} title="What turns to foil" action={<TextAction onClick={surprise}>Surprise me</TextAction>}>
-              <div className={CHIPS}>
+            <Section n={2} title="Foil coverage" action={<TextAction onClick={surprise}>Surprise me</TextAction>}>
+              <div className="choice-grid">
                 {(Object.keys(FOIL_MODES) as FoilMode[]).map((k) => (
                   <Choice key={k} value={k} current={settings.mode} onSelect={setMode} title={FOIL_MODES[k].hint}>
                     {FOIL_MODES[k].name}
@@ -489,25 +493,24 @@ export function FoilStudio() {
                   onChange={(amount) => set({ amount })}
                 />
               )}
-              <label className="flex items-center gap-3">
+              <label className="checkbox-control">
                 <input type="checkbox" className="h-4 w-4 accent-ink-black" checked={settings.border} onChange={(e) => set({ border: e.target.checked })} />
                 A foil border round the edge
               </label>
             </Section>
 
             <Section n={3} title="Foil colour">
-              <div className={CHIPS}>
+              <div className="choice-grid">
                 {(Object.keys(FOILS) as FoilKey[]).map((k) => {
                   const f = FOILS[k];
-                  const on = settings.foil === k;
                   return (
                     <button
                       key={k}
                       type="button"
                       title={f.name}
-                      aria-pressed={on}
+                      aria-pressed={settings.foil === k}
                       onClick={() => set({ foil: k })}
-                      className={`flex items-center gap-2 rounded-2xl border px-3 py-1 text-body transition-colors ${on ? "border-ink-black" : "border-ink-black/15 hover:border-ink-black"}`}
+                      className="ui-choice foil-choice"
                     >
                       {/* The swatch is the work's colour, not UI colour. */}
                       <span className="h-3.5 w-3.5 rounded-full" style={{ background: "holo" in f ? "conic-gradient(#ffc9c1, #c4baff, #c7f8fb, #e4ff97, #ffc9c1)" : rgbCss(f.ink) }} />
@@ -533,7 +536,7 @@ export function FoilStudio() {
 
             <Section n={6} title="Stage">
               <label className="flex items-center gap-3">
-                <input type="color" className="h-8 w-10 rounded-2xl border border-ink-black/15" value={stage.background} onChange={(e) => setStage((s) => ({ ...s, background: e.target.value }))} />
+                <input type="color" aria-label="Preview background" className="stage-color" value={stage.background} onChange={(e) => setStage((s) => ({ ...s, background: e.target.value }))} />
                 Preview background
               </label>
               <Slider label="Size %" value={stage.width} min={20} max={100} step={1} onChange={(width) => setStage((s) => ({ ...s, width }))} />
@@ -543,8 +546,8 @@ export function FoilStudio() {
             )}
             {tab === "export" && (
               <>
-            <Section n={7} title="Use it">
-              <div className="flex flex-wrap items-center gap-2">
+            <Section n={7} title="Export">
+              <div className="export-options">
                 <Choice value={"baked" as const} current={output} onSelect={setOutput} title="Ship the two processed maps. Nothing is computed on the visitor's device.">
                   Baked · fastest
                 </Choice>
@@ -552,7 +555,7 @@ export function FoilStudio() {
                   Live
                 </Choice>
                 {output === "baked" && (
-                  <button type="button" onClick={downloadBaked} className={`ml-auto ${GHOST}`} title="Download the print and fx maps">
+                  <button type="button" onClick={downloadBaked} className={`download-maps ${GHOST}`} title="Download the print and fx maps">
                     Download maps
                   </button>
                 )}
@@ -561,10 +564,10 @@ export function FoilStudio() {
                 {code}
               </pre>
               {/* Primary export action. */}
-              <button type="button" onClick={copyCode} className="w-full rounded-2xl bg-ink-black px-5 py-2.5 text-body font-medium text-paper-white hover:opacity-90">
+              <button type="button" onClick={copyCode} className="ui-button ui-button-primary">
                 {copied === "jsx" ? "Copied" : "Copy JSX"}
               </button>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="export-actions">
                 <button type="button" onClick={savePng} className={GHOST}>
                   Save PNG
                 </button>
