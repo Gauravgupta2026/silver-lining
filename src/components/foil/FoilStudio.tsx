@@ -38,6 +38,15 @@ const SAMPLES = [
 ] as const;
 const DEFAULT_STAGE: Stage = { background: "#ffffff", width: 60 };
 const COPIED_MS = 1500;
+const TABS = [
+  { key: "picture", label: "Picture" },
+  { key: "foil", label: "Foil" },
+  { key: "finish", label: "Finish" },
+  { key: "export", label: "Export" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+/** Art never takes more than this share of the stage height, in container-query units. */
+const ART_MAX_HEIGHT_CQH = 86;
 /** Surprise me picks "details" three times as often as "darks", as the original does. */
 const SURPRISE_MODES: FoilMode[] = ["details", "details", "details", "darks"];
 const SURPRISE_BORDER_CHANCE = 0.4;
@@ -75,17 +84,15 @@ function bakedSnippet(s: FoilSettings, base: string): string {
 }
 
 /** Secondary action: transparent, 1px ink border, 8px radius. Indigo is reserved for the one primary. */
-const GHOST = "rounded-control border border-ink bg-transparent px-[18px] py-2 text-body-sm transition-colors hover:bg-ink hover:text-paper";
+const GHOST = "rounded-control border border-ink bg-transparent px-3 py-1.5 text-body-sm transition-colors hover:bg-ink hover:text-paper";
 /** Annotation text: mono with positive tracking, never body copy. */
 const ANNOTATION = "font-mono text-caption text-graphite";
 
+/** One row per slider: label, track, value. Halves the panel height versus stacked rows. */
 function Slider(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; hint?: string; testId?: string }) {
   return (
-    <label className="block" title={props.hint}>
-      <span className="flex items-baseline justify-between text-body-sm">
-        <span>{props.label}</span>
-        <span className={`${ANNOTATION} tabular-nums`}>{round(props.value, 3)}</span>
-      </span>
+    <label className="grid grid-cols-[6.5rem_minmax(0,1fr)_2.75rem] items-center gap-2 text-body-sm" title={props.hint}>
+      <span className="truncate">{props.label}</span>
       <input
         type="range"
         data-testid={props.testId}
@@ -94,18 +101,17 @@ function Slider(props: { label: string; value: number; min: number; max: number;
         step={props.step}
         value={props.value}
         onChange={(e) => props.onChange(Number(e.target.value))}
-        className="mt-1 w-full"
+        className="w-full"
       />
-      {props.hint && <span className="block text-body-sm text-graphite">{props.hint}</span>}
+      <span className={`${ANNOTATION} text-right tabular-nums`}>{round(props.value, 2)}</span>
     </label>
   );
 }
 
-function Section({ n, title, action, children }: { n: number; title: string; action?: ReactNode; children: ReactNode }) {
+function Section({ title, action, children }: { n?: number; title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="space-y-4 border-t border-mist px-6 py-8">
-      <h2 className="flex items-baseline gap-3 text-heading font-[340]">
-        <span className={ANNOTATION}>{String(n).padStart(2, "0")}</span>
+    <section className="space-y-3 border-mist px-4 py-4 sm:px-5 [&+&]:border-t">
+      <h2 className="flex items-baseline gap-2 text-body font-[450]">
         {title}
         {action && <span className="ml-auto">{action}</span>}
       </h2>
@@ -132,7 +138,7 @@ function Choice<T extends string>(props: { value: T; current: T; onSelect: (v: T
       title={props.title}
       aria-pressed={on}
       onClick={() => props.onSelect(props.value)}
-      className={`rounded-pill border px-4 py-2 text-body-sm transition-colors ${on ? "border-ink bg-ink text-paper" : "border-mist bg-paper hover:border-ink"}`}
+      className={`rounded-pill border px-3 py-1 text-body-sm transition-colors ${on ? "border-ink bg-ink text-paper" : "border-mist bg-paper hover:border-ink"}`}
     >
       {props.children}
     </button>
@@ -150,6 +156,8 @@ export function FoilStudio() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("Loading…");
   const [menuOpen, setMenuOpen] = useState(true);
+  const [artAspect, setArtAspect] = useState(1);
+  const [tab, setTab] = useState<TabKey>("picture");
   const [hydrated, setHydrated] = useState(false);
   const handle = useRef<FoilHandle | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -281,9 +289,9 @@ export function FoilStudio() {
   return (
     <div className="fixed inset-0 flex flex-col bg-paper text-body-sm text-ink">
       <SiteNav current="studio" />
-      <div className={`grid min-h-0 flex-1 ${menuOpen ? "grid-cols-[minmax(0,1fr)_400px]" : "grid-cols-1"}`}>
+      <div className={`flex min-h-0 flex-1 flex-col lg:grid ${menuOpen ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]" : "lg:grid-cols-1"}`}>
         <div
-          className="relative flex items-center justify-center overflow-hidden"
+          className={`relative flex items-center justify-center overflow-hidden [container-type:size] ${menuOpen ? "h-[42svh] shrink-0 lg:h-auto" : "flex-1"}`}
           style={{ background: stage.background }}
           onDragOver={(e) => {
             e.preventDefault();
@@ -304,35 +312,54 @@ export function FoilStudio() {
             tiltable
             onPick={settings.mode === "colour" ? (pick) => set({ pick }) : undefined}
             onReady={(h) => (handle.current = h)}
-            onBuild={(ms, size) => setStatus(`${size.width}×${size.height} map · ${Math.round(ms)} ms`)}
+            onBuild={(ms, size) => {
+              setStatus(`${size.width}×${size.height} map · ${Math.round(ms)} ms`);
+              setArtAspect(size.width / size.height);
+            }}
             onError={(err) => setStatus(`Couldn't render: ${err.message}`)}
-            style={{ width: `${stage.width}%`, maxHeight: "86%" }}
+            // Fit inside the stage on both axes: the width share, capped so the height never exceeds ART_MAX_HEIGHT.
+            style={{ width: `min(${stage.width}cqw, ${ART_MAX_HEIGHT_CQH * artAspect}cqh)` }}
           />
-          <button type="button" onClick={() => setMenuOpen((o) => !o)} className={`absolute right-6 top-4 bg-paper ${GHOST}`}>
+          <button type="button" onClick={() => setMenuOpen((o) => !o)} className={`absolute right-3 top-3 bg-paper sm:right-4 sm:top-4 ${GHOST}`}>
             {menuOpen ? "Hide panel" : "Show panel"}
           </button>
-          <p data-testid="status" className={`absolute bottom-6 left-6 ${ANNOTATION}`}>
+          <p data-testid="status" className={`absolute bottom-3 left-3 max-w-[60%] truncate sm:bottom-4 sm:left-4 ${ANNOTATION}`}>
             {fileName} · {status}
           </p>
-          <p className="pointer-events-none absolute bottom-6 right-6 text-body-sm text-graphite">
+          <p className="pointer-events-none absolute bottom-3 right-4 hidden text-body-sm text-graphite md:block">
             {settings.mode === "colour" && !settings.pick ? "Click the picture to choose the foil colour" : "Move to steer the light · drag to tilt"}
           </p>
           {dragging && (
-            <div className="pointer-events-none absolute inset-6 grid place-items-center rounded-card border border-dashed border-ink bg-paper/90 text-heading font-[340]">
+            <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-card border border-dashed border-ink bg-paper/90 text-heading font-[340]">
               Drop your picture
             </div>
           )}
         </div>
 
         {menuOpen && (
-          <aside className="overflow-y-auto overscroll-contain border-l border-mist bg-paper">
-            <header className="px-6 pb-2 pt-8">
-              <h1 className="text-heading-lg font-[320]">Foil studio</h1>
-              <p className="mt-3 text-body text-graphite">Turn an illustration into hot-foil stamping that catches the cursor&apos;s light.</p>
+          <aside className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-mist bg-paper lg:border-l lg:border-t-0">
+            <header className="sticky top-0 z-20 bg-paper px-4 pb-3 pt-4 sm:px-5">
+              <h1 className="text-heading font-[340]">Foil studio</h1>
+              <p className="mt-1 text-body-sm text-graphite [@media(max-height:820px)]:hidden max-lg:hidden">Turn an illustration into hot-foil stamping that catches the cursor&apos;s light.</p>
+              {/* Tabs keep each group of controls within one screen, so the studio never becomes a long scroll. */}
+              <div role="tablist" className="mt-3 flex gap-1">
+                {TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`flex-1 rounded-pill px-2 py-1 text-body-sm transition-colors ${tab === t.key ? "bg-ink text-paper" : "text-graphite hover:text-ink"}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </header>
             {error && (
               // Sticky, so errors from any section stay visible. Achromatic by design: ink on mist.
-              <div role="alert" className="sticky top-0 z-10 mx-6 mt-4 flex items-start gap-3 rounded-control bg-mist px-4 py-3 text-body-sm">
+              <div role="alert" className="sticky top-0 z-10 mx-4 mb-3 sm:mx-5 flex items-start gap-3 rounded-control bg-mist px-4 py-3 text-body-sm">
                 <span className="flex-1">{error}</span>
                 <button type="button" aria-label="Dismiss" onClick={() => setError(null)} className="leading-none">
                   ×
@@ -340,6 +367,8 @@ export function FoilStudio() {
               </div>
             )}
 
+            {tab === "picture" && (
+              <>
             <Section n={1} title="Your picture">
               <button type="button" onClick={() => fileInput.current?.click()} className={`w-full ${GHOST}`}>
                 {src.startsWith("blob:") ? "Change picture" : "Upload a picture"}
@@ -354,8 +383,7 @@ export function FoilStudio() {
                   e.target.value = "";
                 }}
               />
-              <p className="text-body-sm text-graphite">Or drop or paste one. It stays in your browser.</p>
-              <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                 <span className={ANNOTATION}>SAMPLES</span>
                 {SAMPLES.map((s) => (
                   <TextAction
@@ -380,6 +408,37 @@ export function FoilStudio() {
               </div>
             </Section>
 
+            <Section n={4} title="Background">
+              <div className="flex flex-wrap gap-2">
+                <Choice value={"transparent" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
+                  Cut out
+                </Choice>
+                <Choice value={"keep" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
+                  Keep
+                </Choice>
+              </div>
+              <div className={ANNOTATION}>OR REPAINT AS PAPER</div>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(PAPERS) as PaperKey[]).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    title={PAPERS[k].name}
+                    aria-label={PAPERS[k].name}
+                    aria-pressed={settings.ground === k}
+                    onClick={() => set({ ground: k })}
+                    className={`h-8 w-8 rounded-full border ${settings.ground === k ? "border-ink ring-2 ring-ink ring-offset-2" : "border-mist"}`}
+                    style={{ background: rgbCss(PAPERS[k].rgb) }}
+                  />
+                ))}
+              </div>
+              <p className="text-body-sm text-graphite">Works when the picture sits on a plain, light background.</p>
+            </Section>
+
+              </>
+            )}
+            {tab === "foil" && (
+              <>
             <Section n={2} title="What turns to foil" action={<TextAction onClick={surprise}>Surprise me</TextAction>}>
               <div className="flex flex-wrap gap-2">
                 {(Object.keys(FOIL_MODES) as FoilMode[]).map((k) => (
@@ -428,7 +487,7 @@ export function FoilStudio() {
                       title={f.name}
                       aria-pressed={on}
                       onClick={() => set({ foil: k })}
-                      className={`flex items-center gap-2 rounded-pill border px-4 py-2 text-body-sm transition-colors ${on ? "border-ink" : "border-mist hover:border-ink"}`}
+                      className={`flex items-center gap-2 rounded-pill border px-3 py-1 text-body-sm transition-colors ${on ? "border-ink" : "border-mist hover:border-ink"}`}
                     >
                       {/* The swatch is the work's colour, not UI colour. */}
                       <span className="h-3.5 w-3.5 rounded-full" style={{ background: "holo" in f ? "conic-gradient(#ffc9c1, #c4baff, #c7f8fb, #e4ff97, #ffc9c1)" : rgbCss(f.ink) }} />
@@ -439,33 +498,10 @@ export function FoilStudio() {
               </div>
             </Section>
 
-            <Section n={4} title="Background">
-              <div className="flex flex-wrap gap-2">
-                <Choice value={"transparent" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
-                  Cut out
-                </Choice>
-                <Choice value={"keep" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
-                  Keep
-                </Choice>
-              </div>
-              <div className={ANNOTATION}>OR REPAINT AS PAPER</div>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(PAPERS) as PaperKey[]).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    title={PAPERS[k].name}
-                    aria-label={PAPERS[k].name}
-                    aria-pressed={settings.ground === k}
-                    onClick={() => set({ ground: k })}
-                    className={`h-8 w-8 rounded-full border ${settings.ground === k ? "border-ink ring-2 ring-ink ring-offset-2" : "border-mist"}`}
-                    style={{ background: rgbCss(PAPERS[k].rgb) }}
-                  />
-                ))}
-              </div>
-              <p className="text-body-sm text-graphite">Works when the picture sits on a plain, light background.</p>
-            </Section>
-
+              </>
+            )}
+            {tab === "finish" && (
+              <>
             <Section n={5} title="Finish" action={<TextAction onClick={() => set({ look: DEFAULT_LOOK, softness: DEFAULT_SETTINGS.softness })}>Reset</TextAction>}>
               <Slider testId="relief" label="Relief" value={settings.look.relief} min={0} max={8} step={0.1} onChange={(v) => setLook({ relief: v })} hint="How deep the stamp presses." />
               <Slider testId="softness" label="Softness" value={settings.softness} min={0} max={8} step={1} onChange={(v) => set({ softness: v })} hint="Rounder, puffier edges." />
@@ -483,28 +519,32 @@ export function FoilStudio() {
               <Slider label="Size %" value={stage.width} min={20} max={100} step={1} onChange={(width) => setStage((s) => ({ ...s, width }))} />
             </Section>
 
+              </>
+            )}
+            {tab === "export" && (
+              <>
             <Section n={7} title="Use it">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Choice value={"baked" as const} current={output} onSelect={setOutput} title="Ship the two processed maps. Nothing is computed on the visitor's device.">
                   Baked · fastest
                 </Choice>
                 <Choice value={"live" as const} current={output} onSelect={setOutput} title="Ship the original picture. Maps are computed in the browser on load.">
                   Live
                 </Choice>
+                {output === "baked" && (
+                  <button type="button" onClick={downloadBaked} className={`ml-auto ${GHOST}`} title="Download the print and fx maps">
+                    Download maps
+                  </button>
+                )}
               </div>
-              {output === "baked" && (
-                <button type="button" onClick={downloadBaked} className={`w-full ${GHOST}`}>
-                  Download the two maps
-                </button>
-              )}
-              <pre data-testid="snippet" className="overflow-x-auto whitespace-pre-wrap rounded-control bg-mist/50 p-4 font-mono text-caption leading-relaxed text-ink">
+              <pre data-testid="snippet" className="max-h-28 overflow-auto whitespace-pre-wrap rounded-control bg-mist/50 p-4 font-mono text-caption leading-relaxed text-ink">
                 {code}
               </pre>
               {/* The one indigo element in the view: the main thing to do here. */}
               <button type="button" onClick={copyCode} className="w-full rounded-pill bg-indigo px-5 py-2.5 text-body-sm font-[480] text-paper hover:opacity-90">
                 {copied === "jsx" ? "Copied" : "Copy JSX"}
               </button>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <button type="button" onClick={savePng} className={GHOST}>
                   Save PNG
                 </button>
@@ -535,12 +575,12 @@ export function FoilStudio() {
                   }}
                 />
               </div>
-              <p className="text-body-sm text-graphite">
-                {output === "baked"
-                  ? `Put ${baseName}-print.png and ${baseName}-fx.png in /public, then paste the JSX. Download again after changing anything above Finish.`
-                  : "Put the picture in /public under the same name, then paste the JSX."}
+              <p className="text-body-sm text-graphite" title="Download the maps again after changing anything outside Finish.">
+                {output === "baked" ? "Put both maps in /public, then paste the JSX." : "Put the picture in /public, then paste the JSX."}
               </p>
             </Section>
+              </>
+            )}
           </aside>
         )}
       </div>
