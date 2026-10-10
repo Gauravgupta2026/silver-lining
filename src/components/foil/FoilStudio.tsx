@@ -261,11 +261,18 @@ export function FoilStudio() {
     a.click();
   };
   const savePng = () => {
-    if (handle.current) download(handle.current.snapshot(), `${baseName}-foil.png`);
+    if (!handle.current) {
+      setError("The live preview is not ready. Reload the page before saving a PNG.");
+      return;
+    }
+    download(handle.current.snapshot(), `${baseName}-foil.png`);
   };
   const downloadBaked = () => {
     const maps = handle.current?.maps();
-    if (!maps) return;
+    if (!maps) {
+      setError("The foil maps are not ready. Reload the page before downloading them.");
+      return;
+    }
     for (const [part, source] of [["print", maps.print], ["fx", maps.fx]] as const) {
       if (source instanceof HTMLCanvasElement) download(source.toDataURL("image/png"), `${baseName}-${part}.png`);
     }
@@ -307,6 +314,7 @@ export function FoilStudio() {
             loadFile(e.dataTransfer.files[0]);
           }}
         >
+          <div className="stage-artwork">
           <FoilArt
             key={src}
             src={src}
@@ -315,28 +323,35 @@ export function FoilStudio() {
             tiltable
             onPick={settings.mode === "colour" ? (pick) => set({ pick }) : undefined}
             onReady={(h) => (handle.current = h)}
-            onBuild={(ms, size) => {
-              setStatus(`${size.width}×${size.height} map · ${Math.round(ms)} ms`);
+            onBuild={(_, size) => {
+              setStatus("Preview ready");
               setArtAspect(size.width / size.height);
             }}
-            onError={(err) => setStatus(`Couldn't render: ${err.message}`)}
+            onError={(err) => {
+              handle.current = null;
+              setStatus(err.message === "WebGL is not available" ? "Static preview · live foil unavailable" : "Preview unavailable");
+            }}
             // Fit inside the stage on both axes: the width share, capped so the height never exceeds ART_MAX_HEIGHT.
             style={{ width: `min(${stage.width}cqw, ${ART_MAX_HEIGHT_CQH * artAspect}cqh)` }}
           />
           <button type="button" aria-expanded={menuOpen} aria-controls="studio-panel" onClick={() => setMenuOpen((o) => !o)} className={`stage-toggle ${GHOST}`}>
             {menuOpen ? "Hide panel" : "Show panel"}
           </button>
-          <p data-testid="status" className={`stage-status ${ANNOTATION}`}>
-            {fileName} · {status}
-          </p>
-          <p className="stage-instruction">
-            {settings.mode === "colour" && !settings.pick ? "Click the picture to choose the foil colour" : "Move to steer the light · drag to tilt"}
-          </p>
           {dragging && (
             <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-2xl border border-dashed border-ink-black bg-paper-white/90 text-heading font-[350]">
               Drop your picture
             </div>
           )}
+          </div>
+          <div className="stage-footer">
+            <p data-testid="status" role="status" className="stage-status" title={`${fileName} · ${status}`}>
+              <span>{fileName}</span>
+              <span>{status}</span>
+            </p>
+            <p className="stage-instruction">
+              {settings.mode === "colour" && !settings.pick ? "Click the picture to pick a colour" : "Move to light · drag to tilt"}
+            </p>
+          </div>
         </div>
 
         {menuOpen && (
@@ -375,7 +390,7 @@ export function FoilStudio() {
             <div key={tab} id="studio-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`tab-${tab}`} className="studio-panel-content">
             {error && (
               // Keep errors visible while the controls scroll.
-              <div role="alert" className="sticky top-0 z-10 mx-4 mb-3 sm:mx-5 flex items-start gap-3 rounded-2xl bg-linen-canvas px-4 py-3 text-body">
+              <div role="alert" className="studio-alert">
                 <span className="flex-1">{error}</span>
                 <button type="button" aria-label="Dismiss" onClick={() => setError(null)} className="leading-none">
                   ×
@@ -413,13 +428,13 @@ export function FoilStudio() {
                       setError(null);
                     }}
                   >
-                    <Image src={sample.src} alt="" width={120} height={72} />
+                    <Image src={sample.src} alt="" width={120} height={72} loading="eager" />
                     <span>{sample.label}</span>
                   </button>
                 ))}
               </div>
               <div className={ANNOTATION}>Shape</div>
-              <div className="choice-grid">
+              <div className="choice-grid shape-choices">
                 {(Object.keys(SHAPES) as ShapeKey[]).map((k) => (
                   <Choice key={k} value={k} current={settings.shape} onSelect={(shape) => set({ shape })}>
                     {SHAPES[k].name}
