@@ -323,7 +323,7 @@ export function FoilStudio() {
             // Fit inside the stage on both axes: the width share, capped so the height never exceeds ART_MAX_HEIGHT.
             style={{ width: `min(${stage.width}cqw, ${ART_MAX_HEIGHT_CQH * artAspect}cqh)` }}
           />
-          <button type="button" aria-expanded={menuOpen} aria-controls="studio-panel" onClick={() => setMenuOpen((o) => !o)} className={`absolute right-3 top-3 bg-paper-white sm:right-4 sm:top-4 ${GHOST}`}>
+          <button type="button" aria-expanded={menuOpen} aria-controls="studio-panel" onClick={() => setMenuOpen((o) => !o)} className={`stage-toggle ${GHOST}`}>
             {menuOpen ? "Hide panel" : "Show panel"}
           </button>
           <p data-testid="status" className={`stage-status ${ANNOTATION}`}>
