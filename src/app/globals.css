@@ -1,8 +1,65 @@
 @import "tailwindcss";
 
+/*
+ * Design system: "white gallery wall with a single indigo spotlight".
+ * Achromatic UI; Electric Indigo is the only saturated fill and marks one primary action per view.
+ * The foil illustrations carry all the colour.
+ */
+@theme {
+  --color-ink: #000000;
+  --color-paper: #ffffff;
+  --color-mist: #e2e2e2;
+  --color-graphite: #595959;
+  --color-indigo: #4d49fc;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale: size / line-height / tracking (tighter as size grows). */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.3;
+  --text-caption--letter-spacing: 0.04em;
+  --text-body-sm: 16px;
+  --text-body-sm--line-height: 1.45;
+  --text-body-sm--letter-spacing: -0.007em;
+  --text-body: 18px;
+  --text-body--line-height: 1.4;
+  --text-body--letter-spacing: -0.01em;
+  --text-heading: 24px;
+  --text-heading--line-height: 1.35;
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading-lg: 56px;
+  --text-heading-lg--line-height: 1.1;
+  --text-heading-lg--letter-spacing: -0.015em;
+  --text-display: 72px;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+
+  /* Four-tier radius grammar: fine UI / ghost controls + inputs / cards / pills. */
+  --radius-fine: 2px;
+  --radius-control: 8px;
+  --radius-card: 16px;
+  --radius-pill: 50px;
+
+  /* The only elevation in the system: floating cards. */
+  --shadow-float: rgba(0, 0, 0, 0.1) 0px 24px 70px 0px;
+}
+
 html,
 body {
   margin: 0;
-  background: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "kern";
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-indigo);
+  outline-offset: 2px;
+}
+
+input[type="range"] {
+  accent-color: var(--color-ink);
 }
