@@ -1,54 +1,61 @@
 @theme {
   /* Colors */
-  --color-linen-canvas: #f7f5f3;
-  --color-ink-black: #0d0d0d;
-  --color-paper-white: #ffffff;
-  --color-stone: #6e6a69;
-  --color-pebble: #9a9796;
+  --color-paper-white: #fafafa;
+  --color-pure-white: #ffffff;
+  --color-hairline: #ebebeb;
+  --color-ash: #c9c9c9;
+  --color-smoke: #a8a8a8;
+  --color-graphite: #8f8f8f;
+  --color-slate: #7d7d7d;
+  --color-stone: #666666;
+  --color-charcoal: #4d4d4d;
+  --color-obsidian: #171717;
+  --color-carbon: #000000;
+  --color-terminal-green: #297a3a;
+  --color-spectrum-gradient: #ff1744;
+  --color-solar-edge: #ffdc30;
 
   /* Typography */
-  --font-cosmosoracle: 'cosmosOracle', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-geist-sans: 'Geist Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-geist-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Typography — Scale */
-  --text-caption: 14px;
-  --leading-caption: 1.5;
-  --tracking-caption: 0px;
+  --text-eyebrow: 11px;
+  --leading-eyebrow: 1.5;
+  --text-caption: 13px;
+  --leading-caption: 1.54;
   --text-body: 16px;
   --leading-body: 1.5;
-  --tracking-body: -0.18px;
-  --text-subheading: 18px;
-  --leading-subheading: 1.29;
-  --tracking-subheading: -0.2px;
-  --text-heading-sm: 24px;
-  --leading-heading-sm: 1.2;
-  --tracking-heading-sm: -0.48px;
-  --text-heading: 33px;
+  --text-heading: 30px;
   --leading-heading: 1.1;
-  --tracking-heading: -1.32px;
-  --text-heading-lg: 38px;
-  --leading-heading-lg: 1.08;
-  --tracking-heading-lg: -1.52px;
-  --text-display: 58px;
-  --leading-display: 1.06;
-  --tracking-display: -2.32px;
-  --text-display-xl: 74px;
-  --leading-display-xl: 0.8;
-  --tracking-display-xl: -3.7px;
+  --tracking-heading: -1.5px;
+  --text-heading-lg: 56px;
+  --leading-heading-lg: 1;
+  --tracking-heading-lg: -3.36px;
+  --text-display: 64px;
+  --leading-display: 1;
+  --tracking-display: -3.84px;
 
   /* Spacing */
-  --spacing-4: 4px;
-  --spacing-8: 8px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-40: 40px;
-  --spacing-48: 48px;
-  --spacing-72: 72px;
-  --spacing-200: 200px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-44: 44px;
+  --space-208: 208px;
 
   /* Border Radius */
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-2xl-2: 19px;
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-subtle: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgb(250, 250, 250) 0px 0px 0px 1px;
+  --shadow-subtle-2: rgb(235, 235, 235) 0px 0px 0px 1px;
 }

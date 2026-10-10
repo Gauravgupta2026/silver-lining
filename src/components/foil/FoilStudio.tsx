@@ -37,16 +37,15 @@ const SAMPLES = [
   { src: "/foil/umbrella.png", name: "umbrella.png", label: "Parasol" },
   { src: "/foil/demo.svg", name: "demo.svg", label: "Line art" },
 ] as const;
-const DEFAULT_STAGE: Stage = { background: "#f7f5f3", width: 60 };
+const DEFAULT_STAGE: Stage = { background: "#fafafa", width: 60 };
+const LEGACY_STAGE_BACKGROUND = "#f7f5f3";
 const COPIED_MS = 1500;
-const TABS = [
-  { key: "picture", label: "Picture" },
-  { key: "paper", label: "Paper" },
-  { key: "foil", label: "Foil" },
-  { key: "finish", label: "Finish" },
-  { key: "export", label: "Export" },
+const PANEL_GROUPS = [
+  { key: "design", label: "Design" },
+  { key: "finish", label: "Finish & export" },
 ] as const;
-type TabKey = (typeof TABS)[number]["key"];
+type PanelGroup = (typeof PANEL_GROUPS)[number]["key"];
+
 /** Art never takes more than this share of the stage height, in container-query units. */
 const ART_MAX_HEIGHT_CQH = 86;
 /** Surprise me picks "details" three times as often as "darks", as the original does. */
@@ -87,10 +86,8 @@ function bakedSnippet(s: FoilSettings, base: string): string {
 
 /** All actions share the guide's radius and monochrome palette. */
 const GHOST = "ui-button ui-button-secondary";
-/** Muted supporting information uses the caption scale. */
-const ANNOTATION = "text-caption text-stone";
-/** Wrap choices so every option remains visible at narrow widths. */
-const CHIPS = "choice-list";
+/** Labels and values use the guide's monospace stamp style. */
+const ANNOTATION = "field-label";
 
 /** One row per slider: label, track, value. Halves the panel height versus stacked rows. */
 function Slider(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; hint?: string; testId?: string }) {
@@ -112,13 +109,13 @@ function Slider(props: { label: string; value: number; min: number; max: number;
   );
 }
 
-function Section({ title, action, children }: { n?: number; title: string; action?: ReactNode; children: ReactNode }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="studio-section">
-      <h2 className="flex items-baseline gap-2 text-body font-medium">
-        {title}
-        {action && <span className="ml-auto">{action}</span>}
-      </h2>
+      <div className="studio-section-heading">
+        <h2>{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   );
@@ -133,7 +130,7 @@ function TextAction({ onClick, children }: { onClick: () => void; children: Reac
   );
 }
 
-/** Selected choices invert to ink; surfaces stay flat. */
+/** A dark outline marks the selected option without competing with primary actions. */
 function Choice<T extends string>(props: { value: T; current: T; onSelect: (v: T) => void; children: ReactNode; title?: string }) {
   return (
     <button
@@ -144,6 +141,19 @@ function Choice<T extends string>(props: { value: T; current: T; onSelect: (v: T
       className="ui-choice"
     >
       {props.children}
+    </button>
+  );
+}
+
+function PanelToggle({ expanded, onToggle, className }: { expanded: boolean; onToggle: () => void; className: string }) {
+  const label = expanded ? "Hide panel" : "Show panel";
+  return (
+    <button type="button" aria-label={label} title={label} aria-expanded={expanded} aria-controls="studio-panel" onClick={onToggle} className={`${className} ui-button ui-button-secondary`}>
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M15 4v16" />
+        {expanded && <path d="M16 5h4v14h-4z" fill="currentColor" opacity="0.15" stroke="none" />}
+      </svg>
     </button>
   );
 }
@@ -159,8 +169,9 @@ export function FoilStudio() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("Loading…");
   const [menuOpen, setMenuOpen] = useState(true);
+  const [panelGroup, setPanelGroup] = useState<PanelGroup>("design");
+  const panelContent = useRef<HTMLDivElement>(null);
   const [artAspect, setArtAspect] = useState(1);
-  const [tab, setTab] = useState<TabKey>("picture");
   const [hydrated, setHydrated] = useState(false);
   const handle = useRef<FoilHandle | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -173,7 +184,14 @@ export function FoilStudio() {
       if (saved) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration from storage
         setSettings(resolveSettings(saved.settings));
-        setStage({ ...DEFAULT_STAGE, ...saved.stage });
+        setStage({
+          ...DEFAULT_STAGE,
+          ...saved.stage,
+          // Update the former default while preserving custom preview colours.
+          background: saved.stage?.background === LEGACY_STAGE_BACKGROUND
+            ? DEFAULT_STAGE.background
+            : saved.stage?.background ?? DEFAULT_STAGE.background,
+        });
       }
     } catch {
       // Corrupt storage: keep defaults.
@@ -297,8 +315,7 @@ export function FoilStudio() {
   const showAmount = settings.mode !== "all" && (settings.mode !== "colour" || settings.pick);
 
   return (
-    <div className="app-shell text-body">
-      <SiteNav current="studio" />
+    <div className="app-shell studio-shell text-body">
       <main className={`studio-workspace ${menuOpen ? "" : "panel-hidden"}`}>
         <div
           className="studio-stage"
@@ -314,34 +331,33 @@ export function FoilStudio() {
             loadFile(e.dataTransfer.files[0]);
           }}
         >
+          <SiteNav />
           <div className="stage-artwork">
-          <FoilArt
-            key={src}
-            src={src}
-            alt={fileName}
-            settings={settings}
-            tiltable
-            onPick={settings.mode === "colour" ? (pick) => set({ pick }) : undefined}
-            onReady={(h) => (handle.current = h)}
-            onBuild={(_, size) => {
-              setStatus("Preview ready");
-              setArtAspect(size.width / size.height);
-            }}
-            onError={(err) => {
-              handle.current = null;
-              setStatus(err.message === "WebGL is not available" ? "Static preview · live foil unavailable" : "Preview unavailable");
-            }}
-            // Fit inside the stage on both axes: the width share, capped so the height never exceeds ART_MAX_HEIGHT.
-            style={{ width: `min(${stage.width}cqw, ${ART_MAX_HEIGHT_CQH * artAspect}cqh)` }}
-          />
-          <button type="button" aria-expanded={menuOpen} aria-controls="studio-panel" onClick={() => setMenuOpen((o) => !o)} className={`stage-toggle ${GHOST}`}>
-            {menuOpen ? "Hide panel" : "Show panel"}
-          </button>
-          {dragging && (
-            <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-2xl border border-dashed border-ink-black bg-paper-white/90 text-heading font-[350]">
-              Drop your picture
-            </div>
-          )}
+            <FoilArt
+              key={src}
+              src={src}
+              alt={fileName}
+              settings={settings}
+              tiltable
+              onPick={settings.mode === "colour" ? (pick) => set({ pick }) : undefined}
+              onReady={(h) => (handle.current = h)}
+              onBuild={(_, size) => {
+                setStatus("Preview ready");
+                setArtAspect(size.width / size.height);
+              }}
+              onError={(err) => {
+                handle.current = null;
+                setStatus(err.message === "WebGL is not available" ? "Static preview · live foil unavailable" : "Preview unavailable");
+              }}
+              // Fit inside the stage on both axes: the width share, capped so the height never exceeds ART_MAX_HEIGHT.
+              style={{ width: `min(${stage.width}cqw, ${ART_MAX_HEIGHT_CQH * artAspect}cqh)` }}
+            />
+            <PanelToggle expanded={menuOpen} onToggle={() => setMenuOpen((open) => !open)} className="stage-toggle" />
+            {dragging && (
+              <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-md border border-dashed border-obsidian bg-pure-white/90 text-heading font-[450]">
+                Drop your picture
+              </div>
+            )}
           </div>
           <div className="stage-footer">
             <p data-testid="status" role="status" className="stage-status" title={`${fileName} · ${status}`}>
@@ -357,268 +373,256 @@ export function FoilStudio() {
         {menuOpen && (
           <aside id="studio-panel" aria-label="Foil controls" className="studio-panel">
             <header className="studio-panel-header">
-              <h1 className="studio-title">Foil studio</h1>
+              <div className="studio-panel-title-row">
+                <h1 className="studio-title">Foil studio</h1>
+                <PanelToggle expanded={menuOpen} onToggle={() => setMenuOpen(false)} className="panel-close" />
+              </div>
               <p className="studio-description">Edit your illustration, paper and foil.</p>
-              {/* Tabs keep each group of controls within one screen, so the studio never becomes a long scroll. */}
-              <div role="tablist" aria-label="Studio settings" className="studio-tabs">
-                {TABS.map((t) => (
+              <div className="studio-group-tabs" role="tablist" aria-label="Control groups">
+                {PANEL_GROUPS.map((group, index) => (
                   <button
-                    key={t.key}
+                    key={group.key}
+                    id={`group-tab-${group.key}`}
                     type="button"
                     role="tab"
-                    id={`tab-${t.key}`}
-                    aria-controls="studio-tabpanel"
-                    tabIndex={tab === t.key ? 0 : -1}
-                    aria-selected={tab === t.key}
-                    onKeyDown={(e) => {
-                      const index = TABS.findIndex((item) => item.key === tab);
-                      const next = e.key === "ArrowRight" ? (index + 1) % TABS.length : e.key === "ArrowLeft" ? (index + TABS.length - 1) % TABS.length : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : null;
-                      if (next !== null) {
-                        e.preventDefault();
-                        setTab(TABS[next].key);
-                        document.getElementById(`tab-${TABS[next].key}`)?.focus();
-                      }
+                    aria-controls={`group-${group.key}`}
+                    aria-selected={panelGroup === group.key}
+                    tabIndex={panelGroup === group.key ? 0 : -1}
+                    onClick={() => {
+                      setPanelGroup(group.key);
+                      if (panelContent.current) panelContent.current.scrollTop = 0;
                     }}
-                    onClick={() => setTab(t.key)}
-                    className={`flex-1 rounded-2xl px-1 py-1 text-body transition-colors ${tab === t.key ? "bg-ink-black text-paper-white" : "text-stone hover:text-ink-black"}`}
+                    onKeyDown={(event) => {
+                      const next = event.key === "Home" ? 0 : event.key === "End" ? PANEL_GROUPS.length - 1 : event.key === "ArrowRight" ? (index + 1) % PANEL_GROUPS.length : event.key === "ArrowLeft" ? (index + PANEL_GROUPS.length - 1) % PANEL_GROUPS.length : null;
+                      if (next === null) return;
+                      event.preventDefault();
+                      setPanelGroup(PANEL_GROUPS[next].key);
+                      if (panelContent.current) panelContent.current.scrollTop = 0;
+                      document.getElementById(`group-tab-${PANEL_GROUPS[next].key}`)?.focus();
+                    }}
                   >
-                    {t.label}
+                    {group.label}
                   </button>
                 ))}
               </div>
             </header>
-            <div key={tab} id="studio-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`tab-${tab}`} className="studio-panel-content">
-            {error && (
-              // Keep errors visible while the controls scroll.
-              <div role="alert" className="studio-alert">
-                <span className="flex-1">{error}</span>
-                <button type="button" aria-label="Dismiss" onClick={() => setError(null)} className="leading-none">
-                  ×
-                </button>
-              </div>
-            )}
-
-            {tab === "picture" && (
-              <>
-            <Section n={1} title="Your picture">
-              <button type="button" onClick={() => fileInput.current?.click()} className="ui-button ui-button-primary">
-                {src.startsWith("blob:") ? "Change picture" : "Upload a picture"}
-              </button>
-              <input
-                ref={fileInput}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => {
-                  loadFile(e.target.files?.[0]);
-                  e.target.value = "";
-                }}
-              />
-              <div className={ANNOTATION}>Samples</div>
-              <div className="sample-picker">
-                {SAMPLES.map((sample) => (
-                  <button
-                    key={sample.src}
-                    type="button"
-                    aria-pressed={src === sample.src}
-                    className="sample-choice"
-                    onClick={() => {
-                      setSrc(sample.src);
-                      setFileName(sample.name);
-                      setError(null);
-                    }}
-                  >
-                    <Image src={sample.src} alt="" width={120} height={72} loading="eager" />
-                    <span>{sample.label}</span>
+            <div ref={panelContent} className="studio-panel-content" role="region" aria-label="Studio settings" tabIndex={0}>
+              {error && (
+                // Keep errors visible while the controls scroll.
+                <div role="alert" className="studio-alert">
+                  <span className="flex-1">{error}</span>
+                  <button type="button" aria-label="Dismiss" onClick={() => setError(null)} className="leading-none">
+                    ×
                   </button>
-                ))}
-              </div>
-              <div className={ANNOTATION}>Shape</div>
-              <div className="choice-grid shape-choices">
-                {(Object.keys(SHAPES) as ShapeKey[]).map((k) => (
-                  <Choice key={k} value={k} current={settings.shape} onSelect={(shape) => set({ shape })}>
-                    {SHAPES[k].name}
-                  </Choice>
-                ))}
-              </div>
-            </Section>
-
-              </>
-            )}
-            {tab === "paper" && (
-              <>
-            <Section n={4} title="Background">
-              <div className={CHIPS}>
-                <Choice value={"transparent" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
-                  Cut out
-                </Choice>
-                <Choice value={"keep" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
-                  Keep
-                </Choice>
-              </div>
-              <div className={ANNOTATION}>Paper stock</div>
-              <div className={CHIPS}>
-                {(Object.keys(PAPERS) as PaperKey[]).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    title={PAPERS[k].name}
-                    aria-label={PAPERS[k].name}
-                    aria-pressed={settings.ground === k}
-                    onClick={() => set({ ground: k })}
-                    className="paper-swatch"
-                    style={{ background: rgbCss(PAPERS[k].rgb) }}
-                  />
-                ))}
-              </div>
-              <p className="text-body text-stone">Works when the picture sits on a plain, light background.</p>
-            </Section>
-
-              </>
-            )}
-            {tab === "foil" && (
-              <>
-            <Section n={2} title="Foil coverage" action={<TextAction onClick={surprise}>Surprise me</TextAction>}>
-              <div className="choice-grid">
-                {(Object.keys(FOIL_MODES) as FoilMode[]).map((k) => (
-                  <Choice key={k} value={k} current={settings.mode} onSelect={setMode} title={FOIL_MODES[k].hint}>
-                    {FOIL_MODES[k].name}
-                  </Choice>
-                ))}
-              </div>
-              <p className="text-body text-stone">{mode.hint}</p>
-              {settings.mode === "colour" && (
-                <div className="flex items-center gap-3">
-                  <span
-                    data-testid="pick-swatch"
-                    className="h-6 w-6 rounded-2xl border border-ink-black/15"
-                    style={{ background: settings.pick ? rgbCss(settings.pick) : "repeating-linear-gradient(45deg,#e2e2e2 0 4px,#fff 4px 8px)" }}
-                  />
-                  <span className={settings.pick ? ANNOTATION : "text-body text-stone"}>{settings.pick ? rgbCss(settings.pick) : "No colour picked yet"}</span>
                 </div>
               )}
-              {showAmount && (
-                <Slider
-                  testId="amount"
-                  label={settings.mode === "colour" ? "How close a colour" : "How much foil"}
-                  value={settings.amount}
-                  min={mode.range[0]}
-                  max={mode.range[1]}
-                  step={0.005}
-                  onChange={(amount) => set({ amount })}
-                />
-              )}
-              <label className="checkbox-control">
-                <input type="checkbox" className="h-4 w-4 accent-ink-black" checked={settings.border} onChange={(e) => set({ border: e.target.checked })} />
-                A foil border round the edge
-              </label>
-            </Section>
 
-            <Section n={3} title="Foil colour">
-              <div className="choice-grid">
-                {(Object.keys(FOILS) as FoilKey[]).map((k) => {
-                  const f = FOILS[k];
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      title={f.name}
-                      aria-pressed={settings.foil === k}
-                      onClick={() => set({ foil: k })}
-                      className="ui-choice foil-choice"
-                    >
-                      {/* The swatch is the work's colour, not UI colour. */}
-                      <span className="h-3.5 w-3.5 rounded-full" style={{ background: "holo" in f ? "conic-gradient(#ffc9c1, #c4baff, #c7f8fb, #e4ff97, #ffc9c1)" : rgbCss(f.ink) }} />
-                      {f.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </Section>
-
-              </>
-            )}
-            {tab === "finish" && (
-              <>
-            <Section n={5} title="Finish" action={<TextAction onClick={() => set({ look: DEFAULT_LOOK, softness: DEFAULT_SETTINGS.softness })}>Reset</TextAction>}>
-              <Slider testId="relief" label="Relief" value={settings.look.relief} min={0} max={8} step={0.1} onChange={(v) => setLook({ relief: v })} hint="How deep the stamp presses." />
-              <Slider testId="softness" label="Softness" value={settings.softness} min={0} max={8} step={1} onChange={(v) => set({ softness: v })} hint="Rounder, puffier edges." />
-              <Slider testId="crinkle" label="Crinkle" value={settings.look.crinkle} min={0} max={1} step={0.01} onChange={(v) => setLook({ crinkle: v })} hint="Fine texture in the metal." />
-              <Slider testId="shine" label="Shine" value={settings.look.shine} min={0} max={3} step={0.05} onChange={(v) => setLook({ shine: v })} hint="Strength of the white-hot flash." />
-              <Slider testId="lamp" label="Lamp height" value={settings.look.lampHeight} min={0.05} max={0.8} step={0.01} onChange={(v) => setLook({ lampHeight: v })} hint="Low is a tight torch, high a broad wash." />
-              <Slider testId="grain" label="Paper grain" value={settings.look.grain} min={0} max={3} step={0.05} onChange={(v) => setLook({ grain: v })} />
-            </Section>
-
-            <Section n={6} title="Stage">
-              <label className="flex items-center gap-3">
-                <input type="color" aria-label="Preview background" className="stage-color" value={stage.background} onChange={(e) => setStage((s) => ({ ...s, background: e.target.value }))} />
-                Preview background
-              </label>
-              <Slider label="Size %" value={stage.width} min={20} max={100} step={1} onChange={(width) => setStage((s) => ({ ...s, width }))} />
-            </Section>
-
-              </>
-            )}
-            {tab === "export" && (
-              <>
-            <Section n={7} title="Export">
-              <div className="export-options">
-                <Choice value={"baked" as const} current={output} onSelect={setOutput} title="Ship the two processed maps. Nothing is computed on the visitor's device.">
-                  Baked · fastest
-                </Choice>
-                <Choice value={"live" as const} current={output} onSelect={setOutput} title="Ship the original picture. Maps are computed in the browser on load.">
-                  Live
-                </Choice>
-                {output === "baked" && (
-                  <button type="button" onClick={downloadBaked} className={`download-maps ${GHOST}`} title="Download the print and fx maps">
-                    Download maps
+              <div id="group-design" role="tabpanel" aria-labelledby="group-tab-design" hidden={panelGroup !== "design"}>
+                <Section title="Picture">
+                  <button type="button" onClick={() => fileInput.current?.click()} className="ui-button ui-button-primary">
+                    {src.startsWith("blob:") ? "Change picture" : "Upload a picture"}
                   </button>
-                )}
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      loadFile(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                  <div className={ANNOTATION}>Samples</div>
+                  <div className="sample-picker">
+                    {SAMPLES.map((sample) => (
+                      <button
+                        key={sample.src}
+                        type="button"
+                        aria-pressed={src === sample.src}
+                        className="sample-choice"
+                        onClick={() => {
+                          setSrc(sample.src);
+                          setFileName(sample.name);
+                          setError(null);
+                        }}
+                      >
+                        <Image src={sample.src} alt="" width={120} height={72} loading="eager" />
+                        <span>{sample.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="studio-field-row">
+                    <span className={ANNOTATION}>Shape</span>
+                    <select value={settings.shape} onChange={(e) => set({ shape: e.target.value as ShapeKey })} className="studio-select">
+                      {(Object.keys(SHAPES) as ShapeKey[]).map((shape) => (
+                        <option key={shape} value={shape}>{SHAPES[shape].name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </Section>
+
+                <Section title="Paper">
+                  <div className="choice-grid">
+                    <Choice value={"transparent" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
+                      Cut out
+                    </Choice>
+                    <Choice value={"keep" as Ground} current={settings.ground} onSelect={(ground) => set({ ground })}>
+                      Keep
+                    </Choice>
+                  </div>
+                  <div className={ANNOTATION}>Paper stock</div>
+                  <div className="paper-choices">
+                    {(Object.keys(PAPERS) as PaperKey[]).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        title={PAPERS[k].name}
+                        aria-label={PAPERS[k].name}
+                        aria-pressed={settings.ground === k}
+                        onClick={() => set({ ground: k })}
+                        className="paper-swatch"
+                      >
+                        <span aria-hidden="true" className="paper-swatch-colour" style={{ background: rgbCss(PAPERS[k].rgb) }} />
+                        <span>{PAPERS[k].name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-body text-stone">Works when the picture sits on a plain, light background.</p>
+                </Section>
+
+                <Section title="Foil" action={<TextAction onClick={surprise}>Surprise me</TextAction>}>
+                  <div className={ANNOTATION}>Coverage</div>
+                  <div className="choice-grid">
+                    {(Object.keys(FOIL_MODES) as FoilMode[]).map((k) => (
+                      <Choice key={k} value={k} current={settings.mode} onSelect={setMode} title={FOIL_MODES[k].hint}>
+                        {FOIL_MODES[k].name}
+                      </Choice>
+                    ))}
+                  </div>
+                  <p className="text-body text-stone">{mode.hint}</p>
+                  {settings.mode === "colour" && (
+                    <div className="flex items-center gap-3">
+                      <span
+                        data-testid="pick-swatch"
+                        className="h-6 w-6 rounded-md border border-obsidian/15"
+                        style={{ background: settings.pick ? rgbCss(settings.pick) : "repeating-linear-gradient(45deg,#e2e2e2 0 4px,#fff 4px 8px)" }}
+                      />
+                      <span className={settings.pick ? ANNOTATION : "text-body text-stone"}>{settings.pick ? rgbCss(settings.pick) : "No colour picked yet"}</span>
+                    </div>
+                  )}
+                  {showAmount && (
+                    <Slider
+                      testId="amount"
+                      label={settings.mode === "colour" ? "How close a colour" : "How much foil"}
+                      value={settings.amount}
+                      min={mode.range[0]}
+                      max={mode.range[1]}
+                      step={0.005}
+                      onChange={(amount) => set({ amount })}
+                    />
+                  )}
+                  <label className="checkbox-control">
+                    <input type="checkbox" className="h-4 w-4 accent-obsidian" checked={settings.border} onChange={(e) => set({ border: e.target.checked })} />
+                    A foil border round the edge
+                  </label>
+                  <div className={ANNOTATION}>Colour</div>
+                  <div className="choice-grid">
+                    {(Object.keys(FOILS) as FoilKey[]).map((k) => {
+                      const f = FOILS[k];
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          title={f.name}
+                          aria-pressed={settings.foil === k}
+                          onClick={() => set({ foil: k })}
+                          className="ui-choice foil-choice"
+                        >
+                          {/* The swatch is the work's colour, not UI colour. */}
+                          <span className="h-3.5 w-3.5 rounded-full" style={{ background: "holo" in f ? "conic-gradient(#ffc9c1, #c4baff, #c7f8fb, #e4ff97, #ffc9c1)" : rgbCss(f.ink) }} />
+                          {f.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Section>
+
+                <Section title="Preview">
+                  <label className="flex items-center gap-3">
+                    <input type="color" aria-label="Preview background" className="stage-color" value={stage.background} onChange={(e) => setStage((s) => ({ ...s, background: e.target.value }))} />
+                    Preview background
+                  </label>
+                  <Slider label="Size %" value={stage.width} min={20} max={100} step={1} onChange={(width) => setStage((s) => ({ ...s, width }))} />
+                </Section>
+
               </div>
-              <pre data-testid="snippet" className="max-h-28 overflow-auto [@media(max-height:700px)]:max-h-20 whitespace-pre-wrap rounded-2xl bg-linen-canvas p-4 font-mono text-caption leading-relaxed text-ink-black">
-                {code}
-              </pre>
-              {/* Primary export action. */}
-              <button type="button" onClick={copyCode} className="ui-button ui-button-primary">
-                {copied === "jsx" ? "Copied" : "Copy JSX"}
-              </button>
-              <div className="export-actions">
-                <button type="button" onClick={savePng} className={GHOST}>
-                  Save PNG
-                </button>
-                <button type="button" onClick={exportJson} className={GHOST}>
-                  Export settings
-                </button>
-                <button type="button" onClick={() => importInput.current?.click()} className={GHOST}>
-                  Import settings
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSettings(DEFAULT_SETTINGS);
-                    setStage(DEFAULT_STAGE);
-                  }}
-                  className={GHOST}
-                >
-                  Reset all
-                </button>
-                <input
-                  ref={importInput}
-                  type="file"
-                  accept="application/json,.json"
-                  hidden
-                  onChange={(e) => {
-                    importJson(e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
+              <div id="group-finish" role="tabpanel" aria-labelledby="group-tab-finish" hidden={panelGroup !== "finish"}>
+                <Section title="Finish" action={<TextAction onClick={() => set({ look: DEFAULT_LOOK, softness: DEFAULT_SETTINGS.softness })}>Reset</TextAction>}>
+                  <Slider testId="relief" label="Relief" value={settings.look.relief} min={0} max={8} step={0.1} onChange={(v) => setLook({ relief: v })} hint="How deep the stamp presses." />
+                  <Slider testId="softness" label="Softness" value={settings.softness} min={0} max={8} step={1} onChange={(v) => set({ softness: v })} hint="Rounder, puffier edges." />
+                  <Slider testId="crinkle" label="Crinkle" value={settings.look.crinkle} min={0} max={1} step={0.01} onChange={(v) => setLook({ crinkle: v })} hint="Fine texture in the metal." />
+                  <Slider testId="shine" label="Shine" value={settings.look.shine} min={0} max={3} step={0.05} onChange={(v) => setLook({ shine: v })} hint="Strength of the white-hot flash." />
+                  <Slider testId="lamp" label="Lamp height" value={settings.look.lampHeight} min={0.05} max={0.8} step={0.01} onChange={(v) => setLook({ lampHeight: v })} hint="Low is a tight torch, high a broad wash." />
+                  <Slider testId="grain" label="Paper grain" value={settings.look.grain} min={0} max={3} step={0.05} onChange={(v) => setLook({ grain: v })} />
+                </Section>
+
+                <Section title="Export">
+                  <div className="export-options">
+                    <Choice value={"baked" as const} current={output} onSelect={setOutput} title="Ship the two processed maps. Nothing is computed on the visitor's device.">
+                      Baked · fastest
+                    </Choice>
+                    <Choice value={"live" as const} current={output} onSelect={setOutput} title="Ship the original picture. Maps are computed in the browser on load.">
+                      Live
+                    </Choice>
+                    {output === "baked" && (
+                      <button type="button" onClick={downloadBaked} className={`download-maps ${GHOST}`} title="Download the print and fx maps">
+                        Download maps
+                      </button>
+                    )}
+                  </div>
+                  <pre data-testid="snippet" className="max-h-28 overflow-auto [@media(max-height:700px)]:max-h-20 whitespace-pre-wrap rounded-md bg-paper-white p-4 font-mono text-caption leading-relaxed text-obsidian">
+                    {code}
+                  </pre>
+                  {/* Primary export action. */}
+                  <button type="button" onClick={copyCode} className="ui-button ui-button-primary">
+                    {copied === "jsx" ? "Copied" : "Copy JSX"}
+                  </button>
+                  <div className="export-actions">
+                    <button type="button" onClick={savePng} className={GHOST}>
+                      Save PNG
+                    </button>
+                    <button type="button" onClick={exportJson} className={GHOST}>
+                      Export settings
+                    </button>
+                    <button type="button" onClick={() => importInput.current?.click()} className={GHOST}>
+                      Import settings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettings(DEFAULT_SETTINGS);
+                        setStage(DEFAULT_STAGE);
+                      }}
+                      className={GHOST}
+                    >
+                      Reset all
+                    </button>
+                    <input
+                      ref={importInput}
+                      type="file"
+                      accept="application/json,.json"
+                      hidden
+                      onChange={(e) => {
+                        importJson(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </div>
+                  <p className="text-body text-stone [@media(max-height:700px)]:hidden" title="Download the maps again after changing anything outside Finish.">
+                    {output === "baked" ? "Put both maps in /public, then paste the JSX." : "Put the picture in /public, then paste the JSX."}
+                  </p>
+                </Section>
               </div>
-              <p className="text-body text-stone [@media(max-height:700px)]:hidden" title="Download the maps again after changing anything outside Finish.">
-                {output === "baked" ? "Put both maps in /public, then paste the JSX." : "Put the picture in /public, then paste the JSX."}
-              </p>
-            </Section>
-              </>
-            )}
             </div>
           </aside>
         )}

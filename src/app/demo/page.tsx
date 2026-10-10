@@ -18,7 +18,7 @@ const FINISHES: { title: string; src: string; fx?: string; aspect: number; setti
 export default function DemoPage() {
   return (
     <div className="app-shell">
-      <SiteNav current="demo" />
+      <SiteNav />
       <main className="demo-main">
         <header className="demo-heading">
           <h1>Light that follows you.</h1>
