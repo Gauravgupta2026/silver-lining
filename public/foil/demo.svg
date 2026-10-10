@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <g fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">
+    <!-- sun: ring + rays -->
+    <circle cx="800" cy="250" r="110" stroke-width="14"/>
+    <circle cx="800" cy="250" r="70" stroke-width="6"/>
+    <g stroke-width="10">
+      <path d="M800 100v-50M800 400v50M650 250h-50M950 250h50M694 144l-35-35M906 356l35 35M694 356l-35 35M906 144l35-35"/>
+    </g>
+    <!-- waves -->
+    <path d="M200 820c100-50 200-50 300 0s200 50 300 0 200-50 300 0 200 50 300 0" stroke-width="12"/>
+  </g>
+  <text x="800" y="680" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="700" font-size="230" letter-spacing="-4">Gaurav</text>
+</svg>
