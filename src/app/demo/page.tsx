@@ -35,7 +35,7 @@ export default function DemoPage() {
           ))}
         </section>
         <div className="demo-actions">
-          <Link href="/">Open the studio</Link>
+          <Link href="/foil">Open the foil studio</Link>
           <a href="/foil/umbrella.png" download>Download sample</a>
         </div>
       </main>
