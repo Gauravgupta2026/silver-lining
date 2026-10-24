@@ -5,6 +5,7 @@ import Image from "next/image";
 import { SiteNav } from "@/components/SiteNav";
 import { forgetImage } from "@/components/imageCache";
 import { ANNOTATION, Choice, GHOST, PanelTabs, PanelToggle, Section, Slider, TextAction } from "@/components/studio/controls";
+import { VideoExport } from "@/components/studio/VideoExport";
 import { CrtArt, type CrtHandle } from "./CrtArt";
 import {
   CRT_LOOKS,
@@ -393,6 +394,7 @@ export function CrtStudio() {
                   <button type="button" onClick={copyCode} className="ui-button ui-button-primary">
                     {copied ? "Copied" : "Copy JSX"}
                   </button>
+                  <VideoExport getCanvas={() => handle.current?.canvas() ?? null} fileName={`${baseName}-crt`} onError={setError} />
                   <div className="export-actions">
                     <button type="button" onClick={savePng} className={GHOST}>
                       Save PNG
