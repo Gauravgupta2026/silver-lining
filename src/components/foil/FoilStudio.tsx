@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { SiteNav } from "@/components/SiteNav";
 import { ANNOTATION, Choice, GHOST, PanelTabs, PanelToggle, Section, Slider, TextAction } from "@/components/studio/controls";
+import { VideoExport } from "@/components/studio/VideoExport";
 import { FoilArt, forgetImage, type FoilHandle } from "./FoilArt";
 import {
   DEFAULT_LOOK,
@@ -495,6 +496,7 @@ export function FoilStudio() {
                   <button type="button" onClick={copyCode} className="ui-button ui-button-primary">
                     {copied === "jsx" ? "Copied" : "Copy JSX"}
                   </button>
+                  <VideoExport getCanvas={() => handle.current?.canvas() ?? null} fileName={`${baseName}-foil`} onError={setError} />
                   <div className="export-actions">
                     <button type="button" onClick={savePng} className={GHOST}>
                       Save PNG

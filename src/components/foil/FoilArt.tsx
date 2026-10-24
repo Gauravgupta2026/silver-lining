@@ -13,6 +13,8 @@ export type { FoilSettingsInput };
 export interface FoilHandle {
   /** PNG of the current frame, as a data URL. */
   snapshot(): string;
+  /** The live canvas, for video capture. */
+  canvas(): HTMLCanvasElement;
   /** The processed maps, for baking. Null until built or when rendering pre-baked maps. */
   maps(): FoilMaps | null;
 }
@@ -443,6 +445,7 @@ export function FoilArt({ src, fx, alt, settings, className, style, tiltable, on
             draw(0); // the drawing buffer is only readable in the same task as the draw
             return canvas.toDataURL("image/png");
           },
+          canvas: () => canvas,
           maps: () => (baked ? null : maps),
         });
       })

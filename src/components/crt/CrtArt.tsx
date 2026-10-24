@@ -12,6 +12,8 @@ export type { CrtSettingsInput };
 export interface CrtHandle {
   /** PNG of the current frame, as a data URL. */
   snapshot(): string;
+  /** The live canvas, for video capture. */
+  canvas(): HTMLCanvasElement;
 }
 
 interface CrtArtProps {
@@ -462,6 +464,7 @@ export function CrtArt({ src, alt, settings, className, style, onBuild, onReady,
             draw(0); // the drawing buffer is only readable in the same task as the draw
             return canvas.toDataURL("image/png");
           },
+          canvas: () => canvas,
         });
       })
       .catch(fail);
