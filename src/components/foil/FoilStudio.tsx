@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { SiteNav } from "@/components/SiteNav";
+import { ANNOTATION, Choice, GHOST, PanelTabs, PanelToggle, Section, Slider, TextAction } from "@/components/studio/controls";
 import { FoilArt, forgetImage, type FoilHandle } from "./FoilArt";
 import {
   DEFAULT_LOOK,
@@ -82,80 +83,6 @@ function bakedSnippet(s: FoilSettings, base: string): string {
   const parts = [s.foil !== DEFAULT_SETTINGS.foil ? `foil: "${s.foil}"` : "", look.length ? `look: { ${look.join(", ")} }` : ""].filter(Boolean);
   const settings = parts.length ? `\n  settings={{ ${parts.join(", ")} }}` : "";
   return `<FoilArt\n  src="/${base}-print.png"\n  fx="/${base}-fx.png"\n  alt=""${settings}\n/>`;
-}
-
-/** All actions share the guide's radius and monochrome palette. */
-const GHOST = "ui-button ui-button-secondary";
-/** Labels and values use the guide's monospace stamp style. */
-const ANNOTATION = "field-label";
-
-/** One row per slider: label, track, value. Halves the panel height versus stacked rows. */
-function Slider(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; hint?: string; testId?: string }) {
-  return (
-    <label className="studio-slider" title={props.hint}>
-      <span className="slider-label">{props.label}</span>
-      <input
-        type="range"
-        data-testid={props.testId}
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-        className="w-full"
-      />
-      <span className={`${ANNOTATION} text-right tabular-nums`}>{round(props.value, 2)}</span>
-    </label>
-  );
-}
-
-function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="studio-section">
-      <div className="studio-section-heading">
-        <h2>{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** Text-only inline action (Surprise me, Reset): underlined ink, no fill. */
-function TextAction({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className="text-action">
-      {children}
-    </button>
-  );
-}
-
-/** A dark outline marks the selected option without competing with primary actions. */
-function Choice<T extends string>(props: { value: T; current: T; onSelect: (v: T) => void; children: ReactNode; title?: string }) {
-  return (
-    <button
-      type="button"
-      title={props.title}
-      aria-pressed={props.value === props.current}
-      onClick={() => props.onSelect(props.value)}
-      className="ui-choice"
-    >
-      {props.children}
-    </button>
-  );
-}
-
-function PanelToggle({ expanded, onToggle, className }: { expanded: boolean; onToggle: () => void; className: string }) {
-  const label = expanded ? "Hide panel" : "Show panel";
-  return (
-    <button type="button" aria-label={label} title={label} aria-expanded={expanded} aria-controls="studio-panel" onClick={onToggle} className={`${className} ui-button ui-button-secondary`}>
-      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <path d="M15 4v16" />
-        {expanded && <path d="M16 5h4v14h-4z" fill="currentColor" opacity="0.15" stroke="none" />}
-      </svg>
-    </button>
-  );
 }
 
 /** Drop an illustration, tune the foil, copy the props for the site. Settings persist locally. */
@@ -378,33 +305,14 @@ export function FoilStudio() {
                 <PanelToggle expanded={menuOpen} onToggle={() => setMenuOpen(false)} className="panel-close" />
               </div>
               <p className="studio-description">Edit your illustration, paper and foil.</p>
-              <div className="studio-group-tabs" role="tablist" aria-label="Control groups">
-                {PANEL_GROUPS.map((group, index) => (
-                  <button
-                    key={group.key}
-                    id={`group-tab-${group.key}`}
-                    type="button"
-                    role="tab"
-                    aria-controls={`group-${group.key}`}
-                    aria-selected={panelGroup === group.key}
-                    tabIndex={panelGroup === group.key ? 0 : -1}
-                    onClick={() => {
-                      setPanelGroup(group.key);
-                      if (panelContent.current) panelContent.current.scrollTop = 0;
-                    }}
-                    onKeyDown={(event) => {
-                      const next = event.key === "Home" ? 0 : event.key === "End" ? PANEL_GROUPS.length - 1 : event.key === "ArrowRight" ? (index + 1) % PANEL_GROUPS.length : event.key === "ArrowLeft" ? (index + PANEL_GROUPS.length - 1) % PANEL_GROUPS.length : null;
-                      if (next === null) return;
-                      event.preventDefault();
-                      setPanelGroup(PANEL_GROUPS[next].key);
-                      if (panelContent.current) panelContent.current.scrollTop = 0;
-                      document.getElementById(`group-tab-${PANEL_GROUPS[next].key}`)?.focus();
-                    }}
-                  >
-                    {group.label}
-                  </button>
-                ))}
-              </div>
+              <PanelTabs
+                groups={PANEL_GROUPS}
+                current={panelGroup}
+                onSelect={(key) => {
+                  setPanelGroup(key);
+                  if (panelContent.current) panelContent.current.scrollTop = 0;
+                }}
+              />
             </header>
             <div ref={panelContent} className="studio-panel-content" role="region" aria-label="Studio settings" tabIndex={0}>
               {error && (

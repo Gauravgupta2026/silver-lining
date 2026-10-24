@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { loadImage } from "@/components/imageCache";
 import { FOIL_FRAGMENT, FOIL_VERTEX } from "./foilShader";
 import { FOILS, mapKey, resolveSettings, type FoilSettingsInput, type RGB } from "./foilSettings";
 import { analyse, composeMaps, samplePick, type FoilMaps } from "./prepareFoilMaps";
 
+export { forgetImage } from "@/components/imageCache";
 export type { FoilSettingsInput };
 
 /** Imperative handle for tools such as the studio. */
@@ -107,28 +109,6 @@ function releasePointer() {
   window.removeEventListener("pointerup", onUp);
   window.removeEventListener("pointercancel", onUp);
   document.documentElement.removeEventListener("pointerleave", onLeave);
-}
-
-/** Decoded images, shared across instances and re-renders. Keyed by URL. */
-const images = new Map<string, Promise<HTMLImageElement>>();
-function loadImage(src: string) {
-  let p = images.get(src);
-  if (!p) {
-    const img = new Image();
-    // Needed to read pixels from images on another origin (they must send CORS headers).
-    if (!src.startsWith("blob:") && !src.startsWith("data:")) img.crossOrigin = "anonymous";
-    img.decoding = "async";
-    img.src = src;
-    p = img.decode().then(() => img);
-    p.catch(() => images.delete(src));
-    images.set(src, p);
-  }
-  return p;
-}
-
-/** Drops a cached image, e.g. after revoking a blob URL. */
-export function forgetImage(src: string) {
-  images.delete(src);
 }
 
 interface GLState {
